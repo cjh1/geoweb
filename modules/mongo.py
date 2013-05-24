@@ -3,6 +3,7 @@
 import bson.json_util
 import pymongo
 import geoweb
+import cherrypy
 
 def decode(s, argname, resp):
     try:
@@ -14,6 +15,8 @@ def decode(s, argname, resp):
 def run(server, db, coll, method='find', query=None, limit=1000, fields=None, sort=None, fill=None):
     # Create an empty response object.
     response = geoweb.empty_response();
+
+    cherrypy.log("running query: %s, %s, %s, %s" % (db, coll, method, query))
 
     # Check the requested method.
     if method not in ['find', 'insert']:
@@ -30,6 +33,7 @@ def run(server, db, coll, method='find', query=None, limit=1000, fields=None, so
         else:
             fill = True
     except ValueError:
+        cherrypy.log("value error ")
         return bson.json_util.dumps(response)
 
     # Cast the limit value to an int.
@@ -67,5 +71,6 @@ def run(server, db, coll, method='find', query=None, limit=1000, fields=None, so
     else:
         raise RuntimeError("illegal method '%s' in module 'mongo'")
 
+    cherrypy.log("response: %s" % str(response))
     # Return the response object.
     return bson.json_util.dumps(response)

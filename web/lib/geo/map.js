@@ -113,6 +113,7 @@ geoModule.map = function(node, options) {
     document.onmouseup = m_viewer.handleMouseUp;
     document.onmousemove = m_viewer.handleMouseMove;
     document.oncontextmenu = m_viewer.handleContextMenu;
+    document.onkeypress = m_viewer.handleKeyPress;
     HTMLCanvasElement.prototype.relMouseCoords = m_viewer.relMouseCoords;
 
     return mapActor;

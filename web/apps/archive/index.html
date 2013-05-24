@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
+  <head>
   <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
   <script src="http://code.jquery.com/ui/1.10.1/jquery-ui.js"></script>
 
@@ -8,6 +8,7 @@
   <script type="text/javascript" src="/common/js/gl-matrix.js"></script>
   <script type="text/javascript" src="/common/js/select2.min.js"></script>
   <script type="text/javascript" src="/lib/geoweb.min.js"></script>
+  <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
   <script type="text/javascript" src="archive.js"></script>
   <script>
     function init() {
@@ -118,6 +119,17 @@
       overflow: auto;
     }
 
+    .query-in-progress {
+        background-image: url('ui-anim_basic_16x16.gif');
+        background-position: 512px 6px;
+        background-repeat: no-repeat;
+    }
+
+   .whatadrag {
+      width: 0px;
+      height: 0px;
+
+    }
   </style>
   </head>
   <body onload="archive.main()">
@@ -140,11 +152,54 @@
                 <i id="collapse-icon" class="icon-chevron-down"></i>
             </div>
         </div>
-
         <div class="row-fluid">
           <div class="span5">
             <div id="documents-container" class="row-fluid">
               <div class="accordion" id="documents">
+                <div class="accordion-group">
+                  <div class="accordion-heading">
+                    <a class="accordion-toggle" data-toggle="collapse"
+                      data-parent="#documents"
+                      href="#collapse-documents">Documents</a>
+                  </div>
+                  <div class="accordion-body collapse in"
+                    id="collapse-documents">
+                    <div class="accordion-inner">
+                      <div>
+                      <div class="input-prepend">
+                      <span class="add-on"><i class="icon-search"></i></span>
+                      </div>
+                      <input class="input-large" id="query-input" type="text" placeholder="Query" style="width:90%; z-index:10000000000"/>
+                      <div>
+                        <div id="source" class="btn-group" data-toggle="buttons-checkbox" style="display: inline">
+                          <button type="button" class="btn btn-medium btn-success" id="local">Local</button>
+                          <button type="button" class="btn btn-medium btn-info"id="esgf">ESGF</button>
+                          <button type="button" class="btn btn-medium btn-warning"id="nasa">NASA</button>
+
+                        </div>
+                         <div style="display: inline; padding-top: 10px">
+                           <div class="input-prepend">
+                             <span class="add-on"><i class="icon-calendar"></i></span>
+                           </div>
+                          <input class="input-small" type="text" id="from"/>
+                          <div class="input-prepend">
+                            <span class="add-on"><i class="icon-calendar"></i></span>
+                          </div>
+                          <input class="input-small" type="text" id="to"/>
+                        </div>
+                      </div>
+
+                      <table id="document-table" class="table-hover">
+                        <thead>
+                        <tr><th>Name</th><th>Source</th><th>Tags</th><th>Parameters</th><tr>
+                        </thead>
+                        <tbody id="document-table-body">
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

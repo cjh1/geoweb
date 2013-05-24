@@ -13,11 +13,160 @@ archive.getMongoConfig = function() {
     }
 };
 
+archive.init = function() {
+  $('#from').datepicker();
+  $('#to').datepicker();
+
+  // update class to add processing spinner
+  $('#query-input').bind("keyup", function() {
+    console.log("down");
+    query = $('#query-input').val();
+
+    console.log(query.length)
+    if (0 == query.length) {
+      $('#query-input').removeClass("query-in-progress");
+      $('#document-table-body').empty();
+    }
+    else {
+      $('#query-input').addClass("query-in-progress");
+      archive.query(query)
+    }
+  })
+
+  $('#glcanvas').droppable({
+    drop: function(event, ui) {
+
+      console.log(ui.draggable);
+      console.log(d3.select(ui.draggable).data());
+
+      console.log($(ui.helper).data("dataset"))
+    }
+  });
+
+
+}
+
+archive.processResults = function(results) {
+  var tr = d3.select('#document-table-body').selectAll("tr")
+    .data(results, function(d) {
+      return d['_id'].$oid;
+    });
+
+  var rows = tr.enter().append('tr');
+  //.property('id', function(d) {
+  //  return d['id'];
+  //});
+  tr.exit().remove();
+
+  var td = rows.selectAll('td')
+    .data(function(row) {
+      // Display the tags, we should probably truncate the list ...
+      var tags = []
+      $.each(row['variables'], function(index, variable) {
+        tags = tags.concat(variable['tags']);
+      });
+
+
+      return [row['name'], 'Local', tags.join()] ;
+    });
+
+   td.enter().append('td').text(function(d) { return d; });
+
+  // Populate the parameter list
+  var select = rows.append('select');
+
+  select = select.selectAll('select').data(function(row) {
+    var variables = [];
+    $.each(row['variables'], function(index, variable) {
+      variables = variables.concat(variable['name']);
+    });
+
+    return variables;
+  });
+
+  select.enter().append('option').text(function(variable) {
+    console.log("v: " + variable)
+    return variable;
+  });
+  select.exit().remove();
+
+  $('tr').draggable( {
+    cursor: 'move',
+    containment: 'window',
+    appendTo: 'body',
+    helper: function(event) {
+
+    var parameter = $('> select', this).val();
+
+    var data = d3.select(this).data();
+
+    drag = $('<div class="whatadrag"><img src="1369422679_database.png"/><div id="parameter" style="position: relative; top: -70px; right: -50px;"><b>' + parameter + '<b></div></div>');
+
+    drag.data("dataset", {
+      dataset_id: data[0].id,
+      source: data[0].source,
+      parameter: parameter
+    });
+
+    return drag;
+    }
+  })
+
+  $('#query-input').removeClass("query-in-progress");
+}
+
+archive.query = function(query) {
+  console.log("mongo query")
+  mongo = archive.getMongoConfig();
+
+  queryTerms = query.split(" ")
+  or = []
+  $.each(queryTerms, function(index, value) {
+    if (value.length != 0)
+      or[index] = {tags: {$regex: '.*' + value +'.*', $options: 'i'}};
+  });
+
+  mongoQuery = {variables: {$elemMatch: { $or: or}}}
+
+  console.log(JSON.stringify(mongoQuery));
+
+  $.ajax({
+    type: 'POST',
+    url: '/mongo/' + mongo.server + '/' + mongo.database + '/' + mongo.collection,
+    data: {
+      query: JSON.stringify(mongoQuery),
+      limit:100,
+      fields: JSON.stringify(['name', 'basename', 'variables'])
+    },
+    dataType: 'json',
+    success: function(response) {
+      if (response.error !== null) {
+          console.log("[error] " + response.error ? response.error : "no results returned from server");
+      } else {
+
+        // Convert _id.$oid into id field, this transformation is do so the
+        // data is in the same for as other sources. Also add the source.
+        $.each(response.result.data, function(index, row) {
+          row['id'] = row['_id'].$oid;
+          row['source'] = "Local"
+        });
+
+        archive.processResults(response.result.data);
+        //ogs.ui.gis.createDataList('documents', 'Documents', 'table-layers', response.result.data, archive.addLayer);
+      }
+    }
+  });
+}
+
+
+
 /**
  * Main program
  *
  */
 archive.main = function() {
+
+  archive.init();
 
   var mapOptions = {
     zoom : 6,
@@ -148,7 +297,7 @@ archive.getDocuments = function() {
       if (response.error !== null) {
           console.log("[error] " + response.error ? response.error : "no results returned from server");
       } else {
-        ogs.ui.gis.createDataList('documents', 'Documents', 'table-layers', response.result.data, archive.addLayer);
+        //ogs.ui.gis.createDataList('documents', 'Documents', 'table-layers', response.result.data, archive.addLayer);
       }
     }
   });

@@ -69,7 +69,8 @@ vglModule.viewer = function(canvas) {
   this.handleMouseDown = function(event) {
     if (m_ready === true) {
       var fixedEvent = $.event.fix(event || window.event);
-      fixedEvent.preventDefault();
+      // TODO preventDefault action for right mouse click 
+      //fixedEvent.preventDefault();
       fixedEvent.state = 'down';
       fixedEvent.type = vglModule.command.mousePressEvent;
       $(m_that).trigger(fixedEvent);
@@ -81,7 +82,7 @@ vglModule.viewer = function(canvas) {
   this.handleMouseUp = function(event) {
     if (m_ready === true) {
       var fixedEvent = $.event.fix(event || window.event);
-      fixedEvent.preventDefault();
+      //fixedEvent.preventDefault();
       fixedEvent.state = 'up';
       fixedEvent.type = vglModule.command.mousePressEvent;
       $(m_that).trigger(fixedEvent);
@@ -93,7 +94,7 @@ vglModule.viewer = function(canvas) {
   this.handleMouseMove = function(event) {
     if (m_ready === true) {
       var fixedEvent = $.event.fix(event || window.event);
-      fixedEvent.preventDefault();
+      //fixedEvent.preventDefault();
       fixedEvent.type = vglModule.command.mouseMoveEvent;
       $(m_that).trigger(fixedEvent);
     }
@@ -104,7 +105,7 @@ vglModule.viewer = function(canvas) {
   this.handleKeyPress = function(event) {
     if (m_ready === true) {
       var fixedEvent = $.event.fix(event || window.event);
-      fixedEvent.preventDefault();
+      //fixedEvent.preventDefault();
       fixedEvent.type = vglModule.command.keyPressEvent;
       $(m_that).trigger(fixedEvent);
     }
