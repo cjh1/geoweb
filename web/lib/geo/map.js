@@ -37,9 +37,14 @@ geoModule.map = function(node, options) {
       m_options = options,
       m_layers = {},
       m_activeLayer = null,
+      m_layerDrawables = geoModule.layerDrawables(),
+      m_renderTime = ogs.vgl.timestamp(),
+      m_previousLayerDrawablesTime = null,
       m_interactorStyle = null,
       m_viewer = null,
       m_renderer = null;
+
+  m_renderTime.modified();
 
   if (!options.center) {
     m_options.center = geoModule.latlng(0.0, 0.0);
@@ -94,9 +99,9 @@ geoModule.map = function(node, options) {
   // TODO use zoom and center options
   m_baseLayer = (function() {
     var mapActor, worldImage, worldTexture;
-    mapActor = ogs.vgl.utils.createTexturePlane(-180.0, -90.0, 0.0,
-                                                 180.0, -90.0, 0.0,
-                                                -180.0, 90.0, 0.0);
+    mapActor = ogs.vgl.utils.createTexturePlane(-180.0, -90.0, -1.0,
+                                                 180.0, -90.0, -1.0,
+                                                -180.0, 90.0, -1.0);
     // Setup texture
     worldImage = new Image();
     worldImage.src = m_options.source;
@@ -160,12 +165,16 @@ geoModule.map = function(node, options) {
    * @return {Boolean}
    */
   this.addLayer = function(layer) {
+    console.log('layer bin number is ', layer.binNumber() ,layer.name());
     if (layer !== null) {
       // TODO Check if the layer already exists
       // TODO Set the rendering order correctly
-      m_renderer.addActor(layer.feature());
+      if (!layer.binNumber() || layer.binNumber() === -1) {
+        layer.setBinNumber(Object.keys(m_layers).length);
+      }
+
       m_layers[layer.name()] = layer;
-      m_viewer.render();
+      this.prepareForRendering();
       this.modified();
 
       $(this).trigger({
@@ -308,13 +317,16 @@ geoModule.map = function(node, options) {
       // Load countries data first
       reader = ogs.vgl.geojsonReader();
       geoms = reader.readGJObject(ogs.geo.countries);
+      //todo if opacity is on layer, solid color should be too
       layer = ogs.geo.featureLayer({
         "opacity": 1,
         "showAttribution": 1,
         "visible": 1
-      }, ogs.geo.multiGeometryFeature(geoms));
+      }, ogs.geo.multiGeometryFeature(geoms, [1.0,0.5, 0.0]));
 
       layer.setName('country-boundaries');
+      // Use a very high bin number to always draw it last
+      layer.setBinNumber(10000);
       this.addLayer(layer);
       return layer.visible();
     }
@@ -327,6 +339,47 @@ geoModule.map = function(node, options) {
    */
   this.toggleStateBoundaries = function() {
     // @todo Implement this
+  };
+
+  /**
+   * Prepare map for rendering
+   */
+  this.prepareForRendering = function() {
+    var i = 0,
+        layerName = 0,
+        sortedActors = [];
+
+    for (layerName in m_layers) {
+      if (m_layers.hasOwnProperty(layerName)) {
+        m_layers[layerName].prepareForRendering(m_layerDrawables);
+      }
+    }
+
+    if (!m_previousLayerDrawablesTime || (
+      m_layerDrawables.GetMTime() && m_previousLayerDrawablesTime.GetMTime())) {
+      // Clear all actors
+      m_renderer.removeAllActors();
+
+      // Sort actors by layer bin number
+      for (layerName in m_layers) {
+        sortedActors.push([m_layers[layerName].binNumber(),
+          m_layerDrawables.features(layerName)]);
+      }
+
+      console.log('sorted actors are', sortedActors);
+      sortedActors.sort(function(a, b) {return a[0] - b[0]});
+
+      // First add base layer
+      m_renderer.addActor(m_baseLayer);
+
+      // Add actors to renderer in sorted order
+      for (i = 0; i < sortedActors.length; ++i) {
+        console.log('adding ', sortedActors[i][1]);
+        m_renderer.addActors(sortedActors[i][1]);
+      }
+
+      this.redraw();
+    }
   };
 
   // Check if need to show country boundaries
