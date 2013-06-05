@@ -186,13 +186,13 @@ uiModule.gis.addLayer = function(object, layersRootId, elem, selectfunc, togglef
   "use strict";
   var rootId, tbody, basename, layerId, tr, td, button, _id;
   rootId = "#" + layersRootId;
-  _id = $(elem).attr("_id");
+  _id = $(elem).attr("dataset_id");
    if (_id !== null) {
     tbody= $(rootId).find('tbody');
     basename = $(elem).attr("name");
     $(elem).button('loading');
 
-    layerId = basename;
+    layerId = basename.replace(".", "-");
 
     tr = $(document.createElement('tr'));
     tr.attr('id', layerId);
