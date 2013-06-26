@@ -18,6 +18,20 @@
 geoModule.layerSource = function() {
   "use strict";
 
+   /**
+    * @private
+    */
+  var m_requestDataMTime = vglModule.timestamp();
+
+  this.requestDataMTime = function() {
+      return m_requestDataMTime;
+  }
+
+  this.requestDataMTimeModified = function() {
+      // TODO Check for caller here
+      m_requestDataMTime.modified();
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   /**
    * Should be implemented by a concrete class
@@ -49,6 +63,8 @@ geoModule.layerSource = function() {
   ////////////////////////////////////////////////////////////////////////////
   this.getSpatialRange = function() {
   };
+
+
 };
 
 inherit(geoModule.layerSource, ogs.vgl.object);

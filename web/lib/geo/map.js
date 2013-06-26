@@ -241,7 +241,7 @@ geoModule.map = function(node, options) {
       // Transform layer
       geoModule.geoTransform.transformLayer(m_options.gcs, layer);
 
-      m_layers[layer.name()] = layer;
+      m_layers[layer.id()] = layer;
       this.predraw();
       this.modified();
 
@@ -265,7 +265,7 @@ geoModule.map = function(node, options) {
   ////////////////////////////////////////////////////////////////////////////
   this.removeLayer = function(layer) {
     if (layer !== null && typeof layer !== 'undefined') {
-      m_renderer.removeActor(layer.feature());
+      m_renderer.removeActors(layer.features());
       this.modified();
       $(this).trigger({
         type: geoModule.command.removeLayerEvent,
