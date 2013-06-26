@@ -17,6 +17,59 @@ uiModule.gis = function() {
  * @param rootId
  * @param heading
  */
+uiModule.gis.createLayerList = function(rootId, heading, toggleFunct, removeFunct) {
+  var tableRoot = uiModule.gis.createList(rootId, heading);
+
+  // Add the controls
+  var controls = $(document.createElement('div'));
+  controls.attr('id', 'layer-control-btns');
+  controls.addClass('btn-group');
+
+  // Toggle button
+  var toggleButton = $(document.createElement('button'));
+  toggleButton.attr('class', 'btn-layer btn-toggle-layer btn btn-warning disabled layer-control-btn');
+  toggleButton.html('Toggle');
+  controls.append(toggleButton)
+
+  var forEachSelectedLayer = function(funct) {
+    $('#table-layers tr').each(function(i, tr) {
+      // call the function passing the id
+      if ($('#selected', tr)[0].checked)
+        funct(tr.id);
+    });
+  };
+
+  // Add click action
+  toggleButton.click(function() {
+
+    forEachSelectedLayer(function(id) {
+      toggleFunct(this, id);
+    });
+
+  });
+
+  // Remove button
+  var removeButton = $(document.createElement('button'));
+  removeButton.attr('class', 'btn-layer btn-remove-layer btn btn-danger disabled layer-control-btn');
+  removeButton.html('Remove');
+  controls.append(removeButton);
+
+  // Add click action
+  removeButton.click(function() {
+
+    forEachSelectedLayer(function(id) {
+      removeFunct(this, id);
+    });
+
+  });
+
+
+
+  controls.hide();
+
+  $('#'+rootId + ' .accordion-inner').prepend(controls)
+}
+
 uiModule.gis.createList = function(rootId, heading) {
   "use strict";
   var listRoot, itemRoot, itemHeading, itemCollection, subItemsRoot,
@@ -167,25 +220,6 @@ uiModule.gis.createDataList = function(rootId, heading, layersRootId, data, call
     if (callback !== undefined) {
       $(button).on("click", callback);
     }
-
-    // Add 'stream' button
-//    col = $(document.createElement('td'));
-//    var streamBtn = $(document.createElement('button'));
-//    streamBtn.attr('type', 'button');
-//    streamBtn.attr('class', 'btn btn-primary');
-//    streamBtn.attr('id', 'btn-add-' + item.name);
-//    streamBtn.attr('_id', item._id);
-//    streamBtn.attr('name', item.name);
-//    streamBtn.attr('basename', item.basename);
-//    streamBtn.attr('data-toggle', 'button');
-//    streamBtn.attr('data-loading-text', 'Loading...');
-//    streamBtn.html('Add');
-//    col.append(streamBtn);
-//    row.append(col);
-//
-//    streamBtn.click(function(){
-//
-//    });
   });
 
   $('.combobox').width(Math.max.apply(Math, $('.combobox').map(function() {
@@ -202,69 +236,102 @@ uiModule.gis.createDataList = function(rootId, heading, layersRootId, data, call
  * @param layersRootId
  * @param elem
  */
-uiModule.gis.addLayer = function(object, layersRootId, elem, selectfunc, togglefunc, removefunc, workflowfunc, callback) {
+uiModule.gis.addLayer = function(object, layersRootId, dataSet, selectfunc,
+    togglefunc, removefunc, callback, workflowfunc, displayProgress) {
   "use strict";
+
+  // Show controls
+  $('#layer-control-btns').show();
+
   var rootId, tbody, basename, layerId, tr, td, button, _id;
   rootId = "#" + layersRootId;
-  _id = $(elem).attr("_id");
-   if (_id !== null) {
+  layerId = $(dataSet).attr("dataset_id");
+   if (layerId !== null) {
     tbody= $(rootId).find('tbody');
-    basename = $(elem).attr("name");
-    $(elem).button('loading');
+    basename = $(dataSet).attr("name");
 
-    layerId = basename;
 
     tr = $(document.createElement('tr'));
     tr.attr('id', layerId);
     $(tbody).append(tr);
+    tr.data('dataset', dataSet);
+
+    // Layer checkbox
+    td = $(document.createElement('td'));
+    td.width('20px');
+    var checkBox = $(document.createElement('input'));
+    checkBox.attr('type', 'checkbox');
+    checkBox.attr('id', 'selected');
+    td.append(checkBox)
+    tr.append(td);
+
+    // Toggle layer button
+    td = $(document.createElement('td'));
+    td.width('45px');
+    var toggleButton = $(document.createElement('button'));
+    toggleButton.addClass('btn btn-success btn-small')
+    toggleButton.attr('data-toggle', 'button')
+    toggleButton.attr('type', 'button');
+
+    // Add the click action
+    toggleButton.click(layerId, function() {
+      if (toggleButton.hasClass('active')) {
+        console.log('active');
+      }
+      else {
+        console.log('inactive');
+      }
+
+      togglefunc(this, layerId);
+    });
+
+    // Add icon
+    var icon = $(document.createElement('i'));
+    icon.addClass('icon-globe icon-white')
+    toggleButton.append(icon);
+    td.append(toggleButton);
+    tr.append(td);
+
+    // Workflow button
+    td = $(document.createElement('td'));
+    td.width('45px');
+    var workflowButton = $(document.createElement('button'));
+    workflowButton.addClass('btn btn-info btn-small')
+    workflowButton.attr('type', 'button');
+
+    // Add the click action
+    workflowButton.click(layerId, function() {
+      workflowfunc(this, layerId);
+    });
+
+    // Add icon
+    var icon = $(document.createElement('i'));
+    icon.addClass('icon-edit icon-white')
+    workflowButton.append(icon);
+    td.append(workflowButton);
+    tr.append(td);
 
     // Name of the layer
     td = $(document.createElement('td'));
-    td.append($(document.createElement('h4')).html(basename));
+    var nameDiv = $(document.createElement('div'));
+    nameDiv.attr('id', 'name');
+    nameDiv.append($(document.createElement('h4')).html(basename));
+
+    if (displayProgress) {
+      var progress
+        = $(document.createElement('div')).addClass('progress progress-success progress-striped active')
+      var bar = $(document.createElement('div')).addClass('bar');
+      progress.append(bar);
+      bar.width('0%');
+      nameDiv.append(progress);
+    }
+
+    td.append(nameDiv);
     tr.append(td);
 
-    // Select button
+    // Status
     td = $(document.createElement('td'));
-    td.attr('class', 'td-btn-layer');
-    button = $(document.createElement('button'));
-    button.attr('class', 'btn-layer btn-select-layer btn btn-primary disabled');
-    button.attr('disabled', 'disabled');
-    button.html('Select');
-    button.click(layerId, function() {
-      selectfunc(this, layerId);
-    });
-    td.append(button);
-
-    // Toggle button
-    button = $(document.createElement('button'));
-    button.attr('class', 'btn-layer btn-toggle-layer btn btn-warning disabled');
-    button.attr('disabled', 'disabled');
-    button.html('Toggle');
-    button.click(layerId, function() {
-      togglefunc(this, layerId);
-    });
-    td.append(button);
-
-    // Remove button
-    button = $(document.createElement('button'));
-    button.attr('class', 'btn-layer btn-remove-layer btn btn-danger disabled');
-    button.attr('disabled', 'disabled');
-    button.html('Remove');
-    button.click(layerId, function() {
-      removefunc(this, layerId);
-    });
-    td.append(button);
-
-    // Workflow button
-    button = $(document.createElement('button'));
-    button.attr('class', 'btn-layer btn-workflow-layer btn btn-info disabled');
-    button.attr('disabled', 'disabled');
-    button.html('Workflow');
-    button.click(layerId, function() {
-      workflowfunc(this, layerId);
-    });
-    td.append(button);
-    tr.append(td);
+    //td.append(button);
 
     $('.btn-layer').width(Math.max.apply(Math, $('.btn-layer').map(function() {
       return $(this).outerWidth();
@@ -339,15 +406,32 @@ uiModule.gis.selectLayer = function(target, layerId) {
   return true;
 };
 
-/**
- * Create HTML elements for map options
- */
-uiModule.gis.generateOptions = function(table, map) {
+uiModule.gis.hasLayer = function(layerTable, layerId) {
   "use strict";
+
+  var found = false;
+  $('tr', $(layerTable)).each(function(i, tr) {
+    if (tr.id == layerId) {
+      found = true;
+      return;
+    }
+  });
+
+  return found;
+}
+
+/**
+ * Adds map controls that are overalled on the map, such as zoom controls.
+ * map - This is the map object.
+ * map - Container is the parent div holding the gl canvas
+ */
+uiModule.gis.createMapControls = function(map, container) {
+  "use strict";
+
   var options, parent, key, row, col, heading, input, sliderDiv;
   options = map.options();
 
-  parent = $(table);
+  parent = $(container);
 
   function slideZoom(event, ui) {
             map.setZoom(ui.value);
@@ -442,7 +526,10 @@ uiModule.gis.generateOptions = function(table, map) {
       }
     }
   }
-};
+
+
+}
+
 
 /**
  * Create control gui elements for a map
