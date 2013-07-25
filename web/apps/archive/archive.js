@@ -481,11 +481,11 @@ archive.toggleLayer = function(target, layerId) {
 
 
 archive.removeLayer = function(target, layerId) {
+  ogs.ui.gis.removeLayer(target, layerId);
   var layer = archive.myMap.findLayerById(layerId);
   if (layer != null) {
     archive.myMap.removeLayer(layer);
     archive.myMap.redraw();
-    ogs.ui.gis.removeLayer(target, layerId);
     return true;
   }
 
@@ -557,7 +557,7 @@ archive.downloadESGF = function(target, onComplete) {
 
   $('#esgf-login').modal();
 
-  $('#esgf-login').one('hidden', function() {
+  $('#esgf-login #download').one('click', function() {
     var user = $('#user').val();
     var password = $('#password').val();
 
@@ -585,6 +585,11 @@ archive.downloadESGF = function(target, onComplete) {
       }
     });
   });
+
+  $('#esgf-login #cancel').one('click', function() {
+    archive.removeLayer(this, target.dataset_id);
+  });
+
 }
 
 archive.addLayerToMap = function(id, name, filePath, parameter, timeval) {
@@ -636,7 +641,6 @@ archive.addLayer = function(target) {
   if (target.source == 'Local') {
     ogs.ui.gis.addLayer(archive, 'table-layers', target, archive.selectLayer,
       archive.toggleLayer, archive.removeLayer, function() {
-
         ogs.ui.gis.layerAdded(target);
         archive.addLayerToMap(target.dataset_id, target.name, target.basename, varval, timeval);
     }, archive.workflowLayer);
