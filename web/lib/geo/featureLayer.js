@@ -35,7 +35,8 @@ geoModule.featureLayer = function(options, feature) {
       m_newFeatures = [],
       m_expiredFeatures = [],
       m_predrawTime = ogs.vgl.timestamp(),
-      m_updateTime = ogs.vgl.timestamp();
+      m_updateTime = ogs.vgl.timestamp(),
+      m_visible = true;
 
   if (feature) {
     m_newFeatures.push(feature);
@@ -179,6 +180,34 @@ geoModule.featureLayer = function(options, feature) {
       }
     }
   };
+
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Get if layer is visible.
+   *
+   * @returns {Boolean}
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.visible = function() {
+    return m_visible;
+  };
+
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Set layer visible true or false. Set the visability of the features in
+   * this layer.
+   *
+   * @returns {Boolean}
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.setVisible = function(flag) {
+    m_visible = flag
+
+    $.each(m_features, function(i, feature){
+      feature.setVisible(flag)
+    });
+  };
+
 
   this.setOpacity(this.opacity());
   return this;
