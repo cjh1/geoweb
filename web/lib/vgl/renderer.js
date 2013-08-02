@@ -115,7 +115,7 @@ vglModule.renderer = function() {
     for ( i = 0; i < children.length; ++i) {
       actor = children[i];
       actor.computeBounds();
-      if (actor.visible() === false) {
+      if (!actor.visible()) {
         continue;
       }
 
