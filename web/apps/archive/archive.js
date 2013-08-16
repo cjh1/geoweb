@@ -1,4 +1,4 @@
-// Disable console log
+// Disable console log test
 // console.log = function() {}
 
 var archive = {};
@@ -127,9 +127,9 @@ archive.processResults = function(results, removeFilter) {
                {column: 'tags', data: tags.join()}] ;
     });
 
-   td = td.enter().append('td');
-   td.text(function(d) { return d['data']; });
-   td.each(function(d, i) { $(this).addClass(d['column']);});
+    td = td.enter().append('td');
+    td.text(function(d) { return d['data']; });
+    td.each(function(d, i) { $(this).addClass(d['column']);});
 
   // Populate the timesteps parameter list
   var selectTimestep = rows.append('td');
@@ -172,7 +172,22 @@ archive.processResults = function(results, removeFilter) {
   });
   select.exit().remove();
 
-  $('tr').draggable( {
+  // Populate the algorithm list
+  var selectAlgorithm = rows.append('td');
+  selectAlgorithm.classed('algorithm', true);
+  selectAlgorithm = selectAlgorithm.append('select');
+  selectAlgorithm.classed("algorithm-select", true);
+
+  selectAlgorithm = selectAlgorithm.selectAll('select').data(function(row) {
+    return ['default', '10 Year Average'];
+  });
+
+  selectAlgorithm.enter().append('option').text(function(algorithm) {
+    return algorithm;
+  });
+  selectAlgorithm.exit().remove();
+
+  $('#document-table  tr').draggable( {
     cursor: 'move',
     containment: 'window',
     appendTo: 'body',
@@ -180,6 +195,7 @@ archive.processResults = function(results, removeFilter) {
 
     var parameter = $('.parameter-select', this).val();
     var timestep = $('.timestep-select', this).val();
+    var algorithm = $('.algorithm-select', this).val();
 
     if (timestep == 'N/A')
       timestep = null;
@@ -194,6 +210,7 @@ archive.processResults = function(results, removeFilter) {
       source: data[0].source,
       parameter: parameter,
       timestep: timestep,
+      algorithm: algorithm,
       url: data[0].url,
       size: data[0].size,
       checksum: data[0].checksum,
@@ -345,6 +362,7 @@ archive.queryESGF = function(query) {
  *
  */
 archive.main = function() {
+  $('#error-dialog').hide();
   archive.initQueryInterface();
 
   var mapOptions = {
@@ -365,11 +383,6 @@ archive.main = function() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       updateAndDraw(canvas.width, canvas.height);
-
-      var layer = archive.myMap.activeLayer();
-      if(layer && layer.hasOwnProperty('workflow')) {
-        layer.workflow.resize();
-      }
     }
     resizeCanvas();
 
@@ -680,21 +693,32 @@ archive.downloadESGF = function(target, onComplete, message) {
     archive.removeLayer(this, target.dataset_id);
   });
 
-}
+};
 
-archive.addLayerToMap = function(id, name, filePath, parameter, timeval) {
-
-  var source = ogs.geo.archiveLayerSource(JSON.stringify(filePath),
-    JSON.stringify(parameter), archive.error);
-  var layer = ogs.geo.featureLayer();
-  layer.setName(name);
+archive.addLayerToMap = function(target, parameter, timeval, algorithm) {
+  var algorithmData = (
+      algorithm == 'default' ? defaultWorkflow :
+      algorithm == '10 Year Average' ? averageWorkflow :
+      defaultWorkflow
+    ),
+    workflow = ogs.wfl.workflow({
+      data: jQuery.extend(true, {}, algorithmData)
+    }),
+    source = ogs.wfl.workflowLayerSource(
+      JSON.stringify(target.basename),
+      JSON.stringify(parameter),
+      workflow,
+      archive.error
+    ),
+    layer = ogs.geo.featureLayer();
+  workflow.setDefaultWorkflowInputs(target);
+  layer.setName(target.name);
   layer.setDataSource(source);
-  layer.setId(id);
+  layer.setId(target.dataset_id);
   layer.update(ogs.geo.updateRequest(timeval));
-  layer.workflow = ogs.ui.workflow({data:exworkflow});
   archive.myMap.addLayer(layer);
   archive.myMap.redraw();
-}
+};
 
 archive.workflowLayer = function(target, layerId) {
   var layer = archive.myMap.findLayerById(layerId);
@@ -708,20 +732,24 @@ archive.workflowLayer = function(target, layerId) {
         width: Math.floor(window.screen.width * 0.95),
         height: Math.floor(window.screen.height * 0.95),
         buttons: {
-          "Close": function() {
+          Close: function() {
             $(this).dialog("close");
-            layer.setVisible(false);
+            layer.workflow().hide();
+          },
+          Execute: function() {
+            layer.getData((new Date()).getTime());
+            archive.myMap.update();
           }
         }
       });
-    activeWorkflow = layer.workflow;
     layer.workflow.show();
   }
-}
+};
 
 archive.addLayer = function(target) {
   var timeval = target.timestep;
   var varval = target.parameter;
+  var algorithm = target.algorithm;
 
   // If we already have this layer added just return
   if (ogs.ui.gis.hasLayer($('#table-layers'), target.dataset_id))
@@ -731,7 +759,7 @@ archive.addLayer = function(target) {
     ogs.ui.gis.addLayer(archive, 'table-layers', target, archive.selectLayer,
       archive.toggleLayer, archive.removeLayer, function() {
         ogs.ui.gis.layerAdded(target);
-        archive.addLayerToMap(target.dataset_id, target.name, target.basename, varval, timeval);
+        archive.addLayerToMap(target, varval, timeval, algorithm);
     }, archive.workflowLayer);
   }
   else {
@@ -744,4 +772,4 @@ archive.addLayer = function(target) {
       archive.cancelESGFDownload(null, target.dataset_id);
     });
   }
-}
+};
