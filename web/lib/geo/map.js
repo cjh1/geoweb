@@ -60,7 +60,7 @@ geoModule.map = function(node, options) {
       m_renderer = null,
       m_updateRequest = null,
       m_prepareForRenderRequest = null,
-      m_animationTimestepIndex = 0;
+      m_animationStep = 0;
 
   m_renderTime.modified();
 
@@ -500,7 +500,7 @@ geoModule.map = function(node, options) {
 
   ////////////////////////////////////////////////////////////////////////////
   /**
-   * Animate layers of a map
+   * Update the map and then request a draw
    */
   ////////////////////////////////////////////////////////////////////////////
   this.updateAndDraw = function() {
@@ -508,20 +508,56 @@ geoModule.map = function(node, options) {
     m_that.redraw();
   };
 
-  this.incrementAnimationTimestep = function() {
-    return ++m_animationTimestepIndex;
-  }
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Increment current animation step and then return its current value
+   *
+   * @returns {number}
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.nextAnimationStep = function() {
+    return ++m_animationStep;
+  };
 
-  this.animationTimestep = function() {
-    return m_animationTimestepIndex;
-  }
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Decrement current animation step and then return its current value
+   *
+   * @returns {number}
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.prevAnimationStep = function() {
+    return ++m_animationStep;
+  };
 
-  this.resetAnimationTimestep = function() {
-    m_animationTimestepIndex = 0;
-  }
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Return current animation timestep
+   *
+   * @returns {number}
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.animationStep = function() {
+    return m_animationStep;
+  };
 
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Reset the animation step
+   */
+  ////////////////////////////////////////////////////////////////////////////
+  this.resetAnimationStep = function() {
+    m_animationStep = 0;
+  };
+
+  ////////////////////////////////////////////////////////////////////////////
+  /**
+   * Update the map and then request a
+   */
+  ////////////////////////////////////////////////////////////////////////////
   this.animateTimestep = function(currentTime, layers) {
-    for (i = 0; i < layers.length; ++i) {
+    var i = 0;
+    for (; i < layers.length; ++i) {
       layers[i].update(geoModule.updateRequest(currentTime));
       geoModule.geoTransform.transformLayer(m_options.gcs, layers[i]);
     }
@@ -529,9 +565,8 @@ geoModule.map = function(node, options) {
       type: geoModule.command.animateEvent,
       currentTime: currentTime,
     });
-    this.predraw();
     this.redraw();
-  }
+  };
 
   ////////////////////////////////////////////////////////////////////////////
   /**
@@ -562,16 +597,15 @@ geoModule.map = function(node, options) {
     });
 
     function frame() {
-      var i = 0;
-      if (that.animationTimestep() < 0) {
+      if (that.animationStep() < 0) {
         ++currentTime;
       } else {
-        currentTime = timeRange[that.incrementAnimationTimestep()];
+        currentTime = timeRange[that.nextAnimationStep()];
       }
 
-      if (currentTime > endTime || that.animationTimestep() > timeRange.length) {
+      if (currentTime > endTime || that.animationStep() > timeRange.length) {
         clearInterval(intervalId);
-        that.resetAnimationTimestep();
+        that.resetAnimationStep();
       }
       else if (stop) {
         clearInterval(intervalId);
@@ -592,22 +626,22 @@ geoModule.map = function(node, options) {
 
   this.stopAnimation = function() {
     $(this).trigger('animation-stop');
-    m_animationTimestepIndex = 0;
+    m_animationStep = 0;
   }
 
   this.stepAnimationForward = function(timeRange, layers) {
-    if (m_animationTimestepIndex >= timeRange.length)
+    if (m_animationStep >= timeRange.length)
       return
 
-    this.animateTimestep(++m_animationTimestepIndex, layers)
+    this.animateTimestep(++m_animationStep, layers)
   }
 
   this.stepAnimationBackward = function(timeRange, layers) {
 
-    if (m_animationTimestepIndex <= 0)
+    if (m_animationStep <= 0)
       return
 
-    this.animateTimestep(--m_animationTimestepIndex, layers)
+    this.animateTimestep(--m_animationStep, layers)
   }
 
   ////////////////////////////////////////////////////////////////////////////
