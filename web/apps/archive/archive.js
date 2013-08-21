@@ -197,6 +197,11 @@ archive.processResults = function(results, removeFilter) {
     var timestep = $('.timestep-select', this).val();
     var algorithm = $('.algorithm-select', this).val();
 
+    var timesteps = [];
+    $('.timestep-select option', this).each(function() {
+      timesteps.push(parseInt($(this).val()));
+    });
+
     if (timestep == 'N/A')
       timestep = null;
 
@@ -211,6 +216,7 @@ archive.processResults = function(results, removeFilter) {
       parameter: parameter,
       timestep: timestep,
       algorithm: algorithm,
+      timesteps: timesteps,
       url: data[0].url,
       size: data[0].size,
       checksum: data[0].checksum,
