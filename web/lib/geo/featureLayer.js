@@ -308,7 +308,7 @@ geoModule.featureLayer = function(options, feature) {
         if (prim.primitiveType() == gl.TRIANGLES) {
           if (prim.indicesPerPrimitive() != 3)
             console.log("makes no sense, triangles should have 3 vertices");
-          console.log("TRIANGLES: " + prim.numberOfIndices()/3 );
+          //console.log("TRIANGLES: " + prim.numberOfIndices()/3 );
           for (var idx=0; idx<prim.numberOfIndices(); idx+=3) {
             var indices = prim.indices();
             var ia = indices[idx+0];
@@ -348,32 +348,33 @@ geoModule.featureLayer = function(options, feature) {
               return Math.sqrt(r[0]*r[0] + r[1]*r[1] + r[2]*r[2]);
             };
 
-            //console.log("pos: " + va + " : " + vb + " : " + vc);
-
-            var totalArea = triArea(va, vb, vc);
-            if (totalArea == 0) {
-              //console.log("degenerated triangle");
-              continue;
-            };
-
             // this is data that is going down the WebGL pipeline, it better be CCW
             if (isLeftTurn(va, vb, point) && isLeftTurn(vb, vc, point) && isLeftTurn(vc, va, point)) {
-              console.log("found a triangle!");
+              //console.log("found a triangle!");
+
+              var totalArea = triArea(va, vb, vc);
+              if (totalArea == 0) {
+                console.log("degenerated triangle: " + ia + " : " + ib + " : " + ic);
+                console.log("verts: " + va + " : " + vb + " : " + vc);
+                continue;
+              };
+
               // now compute barycentric coordinates
-              var alpha = triArea(point, vb, vc)/ totalArea;
-              var beta  = triArea(point, vc, va)/ totalArea;
-              var gamma = triArea(point, va, vb)/ totalArea;
-              //console.log("area: " + totalArea);
-              //console.log("coords: " + alpha + " : " + beta + " : " + gamma);
+              var alpha = triArea(point, vb, vc) / totalArea;
+              var beta  = triArea(point, vc, va) / totalArea;
+              var gamma = triArea(point, va, vb) / totalArea;
+
               // and interpolate it
               var sa = geomData.getScalar(ia);
               var sb = geomData.getScalar(ib);
               var sc = geomData.getScalar(ic);
+              var value = alpha*sa + beta*sb + gamma*sc;
+
               var result = {
                 layer : this,
                 data : {
                   "feature" : fi ,
-                  "value" : alpha*sa + beta*sb + gamma*sc
+                  "value" : value
                 }
               };
               $(this).trigger(geoModule.command.queryResultEvent, result);
@@ -382,8 +383,11 @@ geoModule.featureLayer = function(options, feature) {
           }
         }
         else if (prim.primitiveType() == gl.TRIANGLE_STRIP) {
-          console.log("TRIANGLE_STRIP: " + prim.numberOfIndices() );
-          // TODO: how to make sense of this? triangleStrip says it has 3 indices per primitive
+          //console.log("TRIANGLE_STRIP: " + prim.numberOfIndices() );
+          /* TODO: how to make sense of this?
+           * triangleStrip says it has 3 indices per primitive, but
+           * numberOfIndices() is returning 4.
+           */
         }
       }
     }
