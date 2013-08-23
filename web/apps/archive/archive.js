@@ -831,7 +831,12 @@ archive.addLayer = function(target) {
     ogs.ui.gis.addLayer(archive, 'table-layers', target, archive.selectLayer,
       archive.toggleLayer, archive.removeLayer, function() {
         ogs.ui.gis.layerAdded(target);
-        archive.addLayerToMap(target, varval, timeval, algorithm);
+        // Calculate the timestep in UTC
+        var start = target.timeInfo.dateRange[0];
+        var time = new Date(Date.UTC(start[0], start[1], start[2]));
+        geoModule.time.incrementTime(time, target.timeInfo.nativeUnits,
+            target.timeInfo.nativeDelta*timeval);
+        archive.addLayerToMap(target, varval, time.getTime(), algorithm);
     }, archive.workflowLayer);
   }
   else {
