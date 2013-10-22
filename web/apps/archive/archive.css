@@ -163,3 +163,7 @@ body {
 #close-extra-info {
   padding-right: 4px;
 }
+
+.table-heading-left {
+  text-align: left;
+}
