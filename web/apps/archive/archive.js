@@ -695,6 +695,33 @@ archive.queryESGF = function(query) {
 
 //////////////////////////////////////////////////////////////////////////////
 /**
+ * Append new gometry of a given type to the list
+ *
+ * @param type
+ * @param vertices
+ * @param indices
+ * @param geomList
+ */
+//////////////////////////////////////////////////////////////////////////////
+var appendGeometry = function(type, vertices, indices, geomList) {
+  var gdata = new vglModule.geometryData(),
+      prim = new type(),
+      src = new vglModule.sourceDataP3fv(), i;
+  //console.log("appendGeometry for " + vertices.length + " vertices and " + indices.length + " indices");
+  prim.setIndices(indices);
+  gdata.addPrimitive(prim);
+
+  src.data().length = vertices.length * 3; //x,y,z
+  for (i = 0; i < vertices.length; ++i) {
+    src.insertAt(i, vertices[i]);
+  }
+
+  gdata.addSource(src);
+  geomList.push(gdata);
+};
+
+//////////////////////////////////////////////////////////////////////////////
+/**
  * Main program
  *
  */
@@ -964,6 +991,304 @@ archive.main = function() {
       $('#algorithm-select').append($('<option>'+name+'</option>'));
     }
   }
+
+  jQuery.event.props.push( "dataTransfer" );
+
+  $('#glcanvas').on({
+    dragenter: function(e) {
+      $(this).css('background-color', 'lightBlue');
+      e.preventDefault();
+    },
+    dragleave: function(e) {
+      $(this).css('background-color', 'white');
+      e.preventDefault();
+    },
+    dragover: function(e) {
+      e.preventDefault();
+    },
+    drop: function(e) {
+      if (!e.dataTransfer)
+        return;
+      $(this).css('background-color', 'white');
+      e.stopPropagation();
+      e.preventDefault();
+
+      var files = e.dataTransfer.files, options = {},
+          basename = "", i, j, k, l, f, fname, geomList, geomData,
+          shapeAttr, shapeGeoms, shapeType, geom, vert, ring, thisStrip, thisPolygon,
+          numNewIndices, lastVert, gdata, prim, src, primContour,
+          polygon, indices, colors, features, layerOptions, layer;
+
+      if (!files) {
+        return;
+      }
+
+      for (i = 0; i < files.length; ++i) {
+        f = files[i];
+        fname = f.name;
+        basename = fname.substr(0, fname.length-4);
+
+        // TODO: more robust checking
+        if (fname.indexOf(".shp") != -1)
+          options["shp"] = f;
+        else if (fname.indexOf(".shx") != -1)
+          options["shx"] = f;
+        else if (fname.indexOf(".dbf") != -1)
+          options["dbf"] = f;
+      }
+
+      if (options["shp"] && options["shx"] && options["dbf"]) {
+        options["success"] = function(data) {
+          //console.log("finished reading shp, shx, dbf files");
+          geomList = []; // fill this with vglModule.geometryData
+          geomData = {};
+
+          // Note: we have to use 16-bit-only indices,
+          // so this algorithm has to break down the buffers.
+          for (i = 0; i < data.length; ++i) {
+            shapeAttr = data[i].attr;
+            shapeGeoms = data[i].geom;
+            shapeType = data[i].type;
+
+            if (shapeType == "Polyline") {
+              if (typeof geomData.Polyline === 'undefined') {
+                geomData.Polyline = {};
+                geomData.Polyline.Vertices = [];
+                geomData.Polyline.Indices = [];
+              }
+              for (j = 0; j < shapeGeoms.length; ++j) {
+                geom = shapeGeoms[j];
+                for (k = 0; k < geom.length; ++k) { // for each ring
+                  ring = geom[k];
+                  thisStrip = [];
+
+                  for (l = 0; l < ring.length; ++l) { // for each vertex
+                    vert = ring[l];
+                    thisStrip.push([vert[0], vert[1], 0]);
+                  }
+
+                  numNewIndices = thisStrip.length * 2 - 2;
+                  // TODO: there could be a ring larger than 64k
+                  if (geomData.Polyline.Vertices.length + thisStrip.length > 65535) {
+                    // too big, just flush and restart
+                      appendGeometry(vglModule.lines,
+                                     geomData.Polyline.Vertices,
+                                     geomData.Polyline.Indices,
+                                     geomList);
+
+                    // clear up
+                    geomData.Polyline.Vertices = [];
+                    geomData.Polyline.Indices = [];
+                  }
+
+                  // Append this strip
+                  lastVert = geomData.Polyline.Vertices.length;
+                  geomData.Polyline.Vertices =
+                    geomData.Polyline.Vertices.concat( thisStrip );
+                  for (var v = lastVert;
+                       v < geomData.Polyline.Vertices.length-1; ++v) {
+                    geomData.Polyline.Indices.push(v);
+                    geomData.Polyline.Indices.push(v+1);
+                  }
+                }
+              }
+            } else if (shapeType == "Polygon") {
+              if (typeof geomData.Polygon === 'undefined') {
+                geomData.Polygon = {};
+                geomData.Polygon.Vertices = [];
+                geomData.Polygon.Indices = [];
+                geomData.Polygon.ContourIndices = [];
+                geomData.Polygon.ContourVertices = [];
+              }
+              for (j = 0; j < shapeGeoms.length; ++j) {
+                geom = shapeGeoms[j];
+                // TODO: check if polygons with holes are allowed.
+                var prevVert;
+                var prevPrevVert;
+                for (k = 0; k < geom.length; ++k) {
+                  ring = geom[k];
+
+                  var p2tPolygon = [];
+                  var thisPolygon = [];
+
+                  // For each vertex
+                  for (l = 0; l < ring.length; ++l) {
+                    vert = ring[l];
+                    if (prevVert) {
+                        if (vert[0] == prevVert[0] && vert[1] == prevVert[1]) {
+                            console.log("repeated point");
+                            continue;
+                        }
+                    }
+
+                    if (prevPrevVert) {
+                        var ax = vert[0];
+                        var ay = vert[1];
+                        var bx = prevVert[0];
+                        var by = prevVert[1];
+                        var cx = prevPrevVert[0];
+                        var cy = prevPrevVert[1];
+                        var area = ax*by + bx*cy + cx*ay - ax*cy - bx*ay - cx*by;
+                        if (Math.abs(area) < 1e-7) {
+                            console.log("colinear edges");
+                            continue;
+                        }
+                    }
+
+                    if (p2tPolygon[0] && vert[0] == p2tPolygon[0].x && vert[1] == p2tPolygon[0].y) {
+                        console.log("repeated first vertex!");
+                        continue;
+                    }
+
+                    //console.log("pushing");
+                    prevPrevVert = prevVert;
+                    prevVert = vert;
+                    p2tPolygon.push(new poly2tri.Point(vert[0], vert[1]));
+
+                    // vgl needs them nested, with z
+                    thisPolygon.push([vert[0], vert[1], 0]);
+                  }
+
+                  var swctx = new poly2tri.SweepContext(p2tPolygon);
+                  //console.log("triangulating");
+                  swctx.triangulate();
+                  //console.log("triangulated");
+                  var triangles = swctx.getTriangles();
+
+                  lastVert = geomData.Polygon.Vertices.length;
+
+                  if (lastVert + p2tPolygon.length > 32768) {
+                    // Flush and restart
+                    //console.log("appending triangles");
+                    appendGeometry(vglModule.triangles,
+                                   geomData.Polygon.Vertices,
+                                   geomData.Polygon.Indices,
+                                   geomList);
+                    appendGeometry(vglModule.lines,
+                                   geomData.Polygon.ContourVertices,
+                                   geomData.Polygon.ContourIndices,
+                                   geomList);
+                    // clear up
+                    geomData.Polygon.Vertices = [];
+                    geomData.Polygon.Indices = [];
+                    geomData.Polygon.ContourVertices = [];
+                    geomData.Polygon.ContourIndices = [];
+                  }
+
+                  triangles.forEach(function(t) {
+                      var a = t.getPoint(0);
+                      var b = t.getPoint(1);
+                      var c = t.getPoint(2);
+                      var idx = geomData.Polygon.Vertices.length;
+                      geomData.Polygon.Vertices.push([a.x, a.y, 0]);
+                      geomData.Polygon.Vertices.push([b.x, b.y, 0]);
+                      geomData.Polygon.Vertices.push([c.x, c.y, 0]);
+                      geomData.Polygon.Indices.push(idx+0);
+                      geomData.Polygon.Indices.push(idx+1);
+                      geomData.Polygon.Indices.push(idx+2);
+                  });
+                  var offset = geomData.Polygon.ContourVertices.length;
+                  for (var idx=0; idx<thisPolygon.length; ++idx) {
+                      geomData.Polygon.ContourIndices.push(offset + idx);
+                      geomData.Polygon.ContourIndices.push(offset + idx + 1);
+                  }
+                  geomData.Polygon.ContourIndices[geomData.Polygon.ContourIndices.length-1] = offset; // close-off
+                  geomData.Polygon.ContourVertices =
+                        geomData.Polygon.ContourVertices.concat(thisPolygon);
+                }
+              }
+            } else if (shapeType == "Point") {
+              if (typeof geomData.Points === 'undefined') {
+                geomData.Points = {};
+                geomData.Points.Vertices = [];
+                // vgl wants indices for points...? so we are under the same 64k limit
+                geomData.Points.Indices = [];
+              }
+              for (j = 0; j < shapeGeoms.length; ++j) {
+
+                if (geomData.Points.Vertices.length + 1 > 65535) {
+                  // too big, just flush and restart
+                  appendGeometry(vglModule.points,
+                                           geomData.Points.Vertices,
+                                           geomData.Points.Indices,
+                                           geomList);
+
+                    // clear up
+                    geomData.Points.Vertices = [];
+                    geomData.Points.Indices = [];
+                }
+
+                geom = shapeGeoms[j];
+                geomData.Points.Vertices.push( [geom[0], geom[1], 0] );
+                geomData.Points.Indices.push(geomData.Points.Indices.length);
+              }
+            }
+          }
+
+          // complete anything left
+          if (geomData.Polyline && geomData.Polyline.Vertices.length > 0) {
+            appendGeometry(vglModule.lines,
+                           geomData.Polyline.Vertices,
+                           geomData.Polyline.Indices,
+                           geomList);
+            geomData.Polyline.Vertices = [];
+            geomData.Polyline.Indices = [];
+          }
+          if (geomData.Polygon && geomData.Polygon.Vertices.length > 0) {
+              appendGeometry(vglModule.triangles,
+                             geomData.Polygon.Vertices,
+                             geomData.Polygon.Indices,
+                             geomList);
+              //appendGeometry(vglModule.lines,
+              //               geomData.Polygon.ContourVertices,
+              //               geomData.Polygon.ContourIndices,
+              //               geomList);
+              geomData.Polygon.Vertices = [];
+              geomData.Polygon.Indices = [];
+              geomData.Polygon.ContourVertices = [];
+              geomData.Polygon.ContourIndices = [];
+          }
+          if (geomData.Points && geomData.Points.Vertices.length > 0) {
+            appendGeometry(vglModule.points,
+                           geomData.Points.Vertices,
+                           geomData.Points.Indices,
+                           geomList);
+            geomData.Points.Vertices = [];
+          }
+
+          colors = [
+            [0.5, 0, 0.25],
+            [0.25, 0, 0.5],
+            [0.25, 0.5, 0],
+            [0.5, 0.25, 0],
+            [0, 0.25, 0.5],
+            [0, 0.5, 0.25]
+            ];
+
+          features = geoModule.compositeGeometryFeature(geomList,
+                           colors[Math.floor(Math.random()*colors.length)]);
+          layerOptions = new geoModule.layerOptions();
+          layer = new geoModule.featureLayer(layerOptions, features);
+          layer.setName("shapefile " + basename);
+          layer.setId("someId");
+          layer.setFeatures(features);
+
+          archive.myMap.addLayer(layer);
+          archive.myMap.draw();
+
+          // TODO: not sure what to do with this
+          ogs.ui.gis.addLayer(archive, 'table-layers', layer,
+                              archive.selectLayer,
+                              archive.toggleLayer,
+                              archive.removeLayer);
+        }
+        var shapefileReader = new vglModule.shapefileReader();
+        shapefileReader.localShapefile(options);
+      } else {
+        console.log("Missing files! (need SHP, SHX and DBF)");
+      }
+    }
+  });
 
   archive.userName(function(openIdUri) {
     var parts = openIdUri.split('/');
